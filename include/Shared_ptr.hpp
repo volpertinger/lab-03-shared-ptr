@@ -7,54 +7,127 @@
 #include <utility>
 
 class ControlBlock {
-  std::atomic_int counter;
+  std::atomic_int strong_counter;
+  std::atomic_int weak_counter;
 
  public:
-  ControlBlock() : counter(0) {}
+  ControlBlock() : strong_counter(0), weak_counter(0) {}
 
   ~ControlBlock() = default;
 
-  void increment() { ++counter; }
+  int increment_strong() {
+    ++strong_counter;
+    return strong_counter;
+  }
 
-  void decrement() { --counter; }
+  int increment_weak() {
+    ++weak_counter;
+    return weak_counter;
+  }
 
-  int get() { return counter; }
+  int decrement_strong() {
+    --strong_counter;
+    return strong_counter;
+  }
+
+  int decrement_weak() {
+    --weak_counter;
+    return weak_counter;
+  }
+
+  int get_strong() { return strong_counter; }
+
+  int get_weak() { return weak_counter; }
 };
 
 template <class T>
 
 class Shared_ptr {
   T* data;
-  ControlBlock control_block;
+  ControlBlock* control_block;
 
  public:
-  Shared_ptr();
+  Shared_ptr<T>() {
+    data = nullptr;
+    control_block = nullptr;
+  }
 
-  Shared_ptr(T* ptr);
+  explicit Shared_ptr(T* ptr) {
+    data = ptr;
+    control_block = ControlBlock();
+    control_block->increment_strong();
+  }
 
-  Shared_ptr(const Shared_ptr& arg);
+  Shared_ptr(const Shared_ptr& arg) {
+    data = arg.data;
+    control_block = arg.control_block;
+    control_block->increment_strong();
+  }
 
-  Shared_ptr(Shared_ptr&& arg);
+  Shared_ptr(Shared_ptr&& arg) noexcept {
+    data = std::move(arg.data);
+    control_block = std::move(arg.control_block);
+  }
 
-  ~Shared_ptr();
+  ~Shared_ptr() {
+    if (!control_block->decrement_strong()) {
+      delete data;
+      delete control_block;
+    }
+  }
 
-  auto operator=(const Shared_ptr& arg) -> Shared_ptr&;
+  auto operator=(const Shared_ptr& arg) noexcept {
+    if (arg != this) {
+      if (data != arg.data) {
+        if (!control_block->decrement_strong()) {
+          delete data;
+          delete control_block;
+        }
+        data = arg.data;
+        control_block = arg.control_block;
+        control_block->increment_strong();
+      }
+    }
+    return *this;
+  }
 
-  auto operator=(Shared_ptr&& arg) -> Shared_ptr&;
+  auto operator=(Shared_ptr&& arg) noexcept {
+    if (this != arg) {
+      std::swap(data, arg.data);
+      std::swap(control_block, arg.control_block);
+    }
+    return *this;
+  }
 
-  // проверяет, указывает ли указатель на объект
-  operator bool() const;
-  auto operator*() const -> T&;
-  auto operator-> () const -> T*;
+  explicit operator bool() const noexcept { return data != nullptr; }
+  auto operator*() const noexcept { return *data; }
+  auto operator-> () const noexcept { return data; }
 
-  auto get() -> T*;
-  void reset();
-  void reset(T* ptr);
-  void swap(Shared_ptr& arg);
+  auto get() { return *data; };
+  void reset() {
+    if (!control_block->decrement_strong()) {
+      delete data;
+      delete control_block;
+    }
+    data = nullptr;
+    control_block = nullptr;
+  }
+  void reset(T* ptr) {
+    if (!control_block->decrement_strong()) {
+      delete data;
+      delete control_block;
+    }
+    data = ptr;
+    control_block = ControlBlock();
+  }
+  void swap(Shared_ptr& arg) {
+    if (arg != this) {
+      std::swap(data, arg.data);
+      std::swap(control_block, arg.control_block);
+    }
+  }
 
-  // возвращает количество объектов SharedPtr, которые ссылаются на тот же
-  // управляемый объект
-  auto use_count() const -> std::size_t;
+  auto use_count() const { return control_block->get_strong(); };
 };
 
 #endif  // INCLUDE_SHARED_PTR_HPP_
