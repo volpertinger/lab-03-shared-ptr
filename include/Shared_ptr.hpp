@@ -78,11 +78,13 @@ class Shared_ptr {
     }
   }
 
-  auto operator=(const Shared_ptr& arg) noexcept {
+  auto operator=(Shared_ptr& arg) noexcept {
     if (data != arg.data) {
-      if (!control_block->decrement_strong()) {
-        delete data;
-        delete control_block;
+      if (control_block != nullptr) {
+        if (!control_block->decrement_strong()) {
+          delete data;
+          delete control_block;
+        }
       }
       data = arg.data;
       control_block = arg.control_block;
@@ -103,7 +105,7 @@ class Shared_ptr {
   auto operator*() const noexcept { return *data; }
   auto operator-> () const noexcept { return data; }
 
-  auto get() { return *data; };
+  auto get() { return *data; }
   void reset() {
     if (!control_block->decrement_strong()) {
       delete data;
@@ -113,21 +115,24 @@ class Shared_ptr {
     control_block = nullptr;
   }
   void reset(T* ptr) {
-    if (!control_block->decrement_strong()) {
-      delete data;
-      delete control_block;
+    if (control_block != nullptr) {
+      if (!control_block->decrement_strong()) {
+        delete data;
+        delete control_block;
+      }
     }
     data = ptr;
     control_block = new ControlBlock;
+    control_block->increment_strong();
   }
   void swap(Shared_ptr& arg) {
-    if (arg != *this) {
+    if (arg.data != data) {
       std::swap(data, arg.data);
       std::swap(control_block, arg.control_block);
     }
   }
 
-  auto use_count() const { return control_block->get_strong(); };
+  auto use_count() const { return control_block->get_strong(); }
 };
 
 #endif  // INCLUDE_SHARED_PTR_HPP_

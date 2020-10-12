@@ -48,8 +48,7 @@ TEST(Shared_ptr, reset_swap) {
 
   sp1.reset();
 
-  EXPECT_EQ(sp1.use_count(), 0);
-  EXPECT_THROW(*sp1, std::invalid_argument);
+  EXPECT_EQ(sp1, false);
 
   Shared_ptr<int> sp2(new int(2));
   sp1 = sp2;
