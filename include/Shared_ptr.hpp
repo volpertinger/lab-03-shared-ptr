@@ -54,7 +54,7 @@ class Shared_ptr {
 
   explicit Shared_ptr(T* ptr) {
     data = ptr;
-    control_block = ControlBlock();
+    control_block = new ControlBlock;
     control_block->increment_strong();
   }
 
@@ -70,36 +70,36 @@ class Shared_ptr {
   }
 
   ~Shared_ptr() {
-    if (!control_block->decrement_strong()) {
-      delete data;
-      delete control_block;
+    if (control_block != nullptr) {
+      if (!control_block->decrement_strong()) {
+        delete data;
+        delete control_block;
+      }
     }
   }
 
   auto operator=(const Shared_ptr& arg) noexcept {
-    if (arg != this) {
-      if (data != arg.data) {
-        if (!control_block->decrement_strong()) {
-          delete data;
-          delete control_block;
-        }
-        data = arg.data;
-        control_block = arg.control_block;
-        control_block->increment_strong();
+    if (data != arg.data) {
+      if (!control_block->decrement_strong()) {
+        delete data;
+        delete control_block;
       }
+      data = arg.data;
+      control_block = arg.control_block;
+      control_block->increment_strong();
     }
     return *this;
   }
 
   auto operator=(Shared_ptr&& arg) noexcept {
-    if (this != arg) {
+    if (*this != arg) {
       std::swap(data, arg.data);
       std::swap(control_block, arg.control_block);
     }
     return *this;
   }
 
-  explicit operator bool() const noexcept { return data != nullptr; }
+  operator bool() const noexcept { return data != nullptr; }
   auto operator*() const noexcept { return *data; }
   auto operator-> () const noexcept { return data; }
 
@@ -118,10 +118,10 @@ class Shared_ptr {
       delete control_block;
     }
     data = ptr;
-    control_block = ControlBlock();
+    control_block = new ControlBlock;
   }
   void swap(Shared_ptr& arg) {
-    if (arg != this) {
+    if (arg != *this) {
       std::swap(data, arg.data);
       std::swap(control_block, arg.control_block);
     }
